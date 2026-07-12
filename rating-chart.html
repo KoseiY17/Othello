@@ -336,79 +336,43 @@
 
 
     /**
-     * 日本オセロ連盟の対局履歴から、
-     * 日付、結果、対局後レート、増減値を読み取る。
-     */
-    function extractGames(text) {
-      const lines = normalizeLines(text);
-      const games = [];
+ * 日本オセロ連盟の対局履歴から、
+ * 日付、結果、対局後レート、増減値を読み取る。
+ *
+ * 日付と大会名が同じ行にある形式にも対応。
+ */
+function extractGames(text) {
+  const games = [];
 
-      for (let i = 0; i < lines.length; i++) {
+  /*
+   * 読み取る並び：
+   *
+   * 日付
+   * 大会名
+   * 対戦相手
+   * 相手レート
+   * 結果
+   * 対局後レート
+   * 増減値
+   *
+   * 改行やタブの位置が変わっても読み取れるようにする。
+   */
+  const gamePattern =
+    /(\d{4}-\d{2}-\d{2})[\s\S]*?([○◯×△])\s*(\d{3,4})\s*([+-]\d+)(?=\s*\d{4}-\d{2}-\d{2}|\s*全\d+件|$)/g;
 
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(lines[i])) {
-          continue;
-        }
+  let match;
 
-        const date = lines[i];
-        const block = [];
+  while ((match = gamePattern.exec(text)) !== null) {
+    games.push({
+      date: match[1],
+      result: match[2] === "◯" ? "○" : match[2],
+      rating: Number(match[3]),
+      change: Number(match[4])
+    });
+  }
 
-        /*
-         * 次の日付が見つかるまでを、1対局分として取得する。
-         */
-        for (let j = i + 1; j < lines.length; j++) {
-          if (/^\d{4}-\d{2}-\d{2}$/.test(lines[j])) {
-            break;
-          }
-
-          block.push(lines[j]);
-        }
-
-        /*
-         * ○、×、△の位置を探す。
-         */
-        const resultIndex = block.findIndex(line =>
-          /^[○◯×△]$/.test(line)
-        );
-
-        if (resultIndex === -1) {
-          continue;
-        }
-
-        let rating = null;
-        let change = null;
-
-        /*
-         * 結果記号より後ろにある最初の整数を
-         * 対局後レートとして取得する。
-         */
-        for (let j = resultIndex + 1; j < block.length; j++) {
-
-          if (rating === null && /^\d{3,4}$/.test(block[j])) {
-            rating = Number(block[j]);
-            continue;
-          }
-
-          if (
-            rating !== null &&
-            /^[+-]\d+$/.test(block[j])
-          ) {
-            change = Number(block[j]);
-            break;
-          }
-        }
-
-        if (rating !== null) {
-          games.push({
-            date: date,
-            result: block[resultIndex],
-            rating: rating,
-            change: change
-          });
-        }
-      }
-
-      return games;
-    }
+  return games;
+}
 
 
     /**
