@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>オセロ レーティング変動シミュレーター</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 20px 12px;
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        "Hiragino Kaku Gothic ProN",
+        "Yu Gothic",
+        sans-serif;
+      background: #f3f5f4;
+      color: #222;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 850px;
+      margin: 0 auto;
+    }
+
+    .card {
+      margin-bottom: 18px;
+      padding: 22px;
+      background: white;
+      border-radius: 14px;
+      box-shadow: 0 3px 14px rgba(0, 0, 0, 0.09);
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      text-align: center;
+      font-size: 27px;
+    }
+
+    h2 {
+      margin-top: 0;
+      font-size: 21px;
+    }
+
+    .description {
+      color: #555;
+      line-height: 1.7;
+    }
+
+    .input-group {
+      margin-bottom: 18px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 7px;
+      font-weight: bold;
+    }
+
+    input[type="number"] {
+      width: 100%;
+      min-height: 48px;
+      padding: 10px 12px;
+      font-size: 18px;
+      border: 1px solid #aaa;
+      border-radius: 8px;
+    }
+
+    .result-buttons {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .result-button {
+      min-height: 50px;
+      border: 2px solid #d0d5d2;
+      border-radius: 9px;
+      background: white;
+      font-size: 17px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .result-button.selected {
+      color: white;
+      background: #08783e;
+      border-color: #08783e;
+    }
+
+    .action-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    button.action {
+      min-height: 48px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .main-button {
+      flex: 2;
+      color: white;
+      background: #08783e;
+    }
+
+    .main-button:hover {
+      background: #056330;
+    }
+
+    .sub-button {
+      flex: 1;
+      color: #333;
+      background: #e3e6e4;
+    }
+
+    .current-rating-box {
+      margin: 18px 0;
+      padding: 18px;
+      text-align: center;
+      background: #eef6f1;
+      border-radius: 12px;
+    }
+
+    .current-label {
+      display: block;
+      margin-bottom: 4px;
+      color: #555;
+      font-size: 14px;
+    }
+
+    .current-rating {
+      display: block;
+      font-size: 38px;
+      font-weight: bold;
+      color: #08783e;
+    }
+
+    .decimal-rating {
+      display: block;
+      margin-top: 3px;
+      color: #777;
+      font-size: 13px;
+    }
+
+    .message {
+      min-height: 26px;
+      margin-top: 12px;
+      color: #c62828;
+      font-weight: bold;
+    }
+
+    .next-message {
+      display: none;
+      margin-top: 14px;
+      padding: 12px;
+      background: #f5f7f6;
+      border-radius: 8px;
+      line-height: 1.6;
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 650px;
+    }
+
+    th,
+    td {
+      padding: 10px 8px;
+      text-align: center;
+      border-bottom: 1px solid #ddd;
+    }
+
+    th {
+      background: #f2f5f3;
+    }
+
+    .positive {
+      color: #08783e;
+      font-weight: bold;
+    }
+
+    .negative {
+      color: #c62828;
+      font-weight: bold;
+    }
+
+    .chart-wrapper {
+      position: relative;
+      height: 380px;
+    }
+
+    .note {
+      color: #666;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .back-link {
+      display: block;
+      margin: 24px 0;
+      text-align: center;
+      color: #08783e;
+      text-decoration: none;
+    }
+
+    @media (max-width: 600px) {
+      .card {
+        padding: 16px;
+      }
+
+      h1 {
+        font-size: 23px;
+      }
+
+      .result-buttons {
+        grid-template-columns: 1fr;
+      }
+
+      .result-button {
+        min-height: 46px;
+      }
+
+      .action-buttons {
+        flex-direction: column;
+      }
+
+      .chart-wrapper {
+        height: 330px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <main class="container">
+
+    <section class="card">
+
+      <h1>オセロ レーティング変動シミュレーター</h1>
+
+      <p class="description">
+        自分の現在レート、対戦相手のレート、対局結果を入力すると、
+        対局後のレートを計算します。
+        計算後は、そのレートを引き継いで次の対局を連続して入力できます。
+      </p>
+
+      <div class="input-group">
+        <label for="initialRating">
+          自分の現在レート
+        </label>
+
+        <input
+          type="number"
+          id="initialRating"
+          inputmode="numeric"
+          placeholder="例：1386"
+          min="0"
+          step="1"
+        >
+      </div>
+
+      <button
+        type="button"
+        class="action main-button"
+        id="startButton"
+        onclick="startSimulation()"
+      >
+        シミュレーションを開始
+      </button>
+
+      <p id="startError" class="message"></p>
+
+    </section>
+
+
+    <section
+      id="simulationCard"
+      class="card"
+      style="display: none;"
+    >
+
+      <div class="current-rating-box">
+        <span class="current-label">
+          現在の予想レート
+        </span>
+
+        <span
+          id="currentRatingDisplay"
+          class="current-rating"
+        >
+          －
+        </span>
+
+        <span
+          id="decimalRatingDisplay"
+          class="decimal-rating"
+        >
+        </span>
+      </div>
+
+      <h2>次の対局</h2>
+
+      <div class="input-group">
+        <label for="opponentRating">
+          次に対戦したプレイヤーのレート
+        </label>
+
+        <input
+          type="number"
+          id="opponentRating"
+          inputmode="numeric"
+          placeholder="例：1450"
+          min="0"
+          step="1"
+        >
+      </div>
+
+      <div class="input-group">
+        <label>対局結果</label>
+
+        <div class="result-buttons">
+
+          <button
+            type="button"
+            class="result-button"
+            data-result="win"
+            onclick="selectResult('win')"
+          >
+            ○ 勝ち
+          </button>
+
+          <button
+            type="button"
+            class="result-button"
+            data-result="draw"
+            onclick="selectResult('draw')"
+          >
+            △ 引き分け
+          </button>
+
+          <button
+            type="button"
+            class="result-button"
+            data-result="lose"
+            onclick="selectResult('lose')"
+          >
+            × 負け
+          </button>
+
+        </div>
+      </div>
+
+      <div class="action-buttons">
+
+        <button
+          type="button"
+          class="action main-button"
+          onclick="addGame()"
+        >
+          対局を追加
+        </button>
+
+        <button
+          type="button"
+          class="action sub-button"
+          onclick="undoLastGame()"
+        >
+          1局戻す
+        </button>
+
+        <button
+          type="button"
+          class="action sub-button"
+          onclick="resetSimulation()"
+        >
+          リセット
+        </button>
+
+      </div>
+
+      <p id="gameError" class="message"></p>
+
+      <p id="nextMessage" class="next-message"></p>
+
+    </section>
+
+
+    <section
+      id="historyCard"
+      class="card"
+      style="display: none;"
+    >
+
+      <h2>対局履歴</h2>
+
+      <div class="table-wrapper">
+
+        <table>
+
+          <thead>
+            <tr>
+              <th>対局</th>
+              <th>対局前</th>
+              <th>相手</th>
+              <th>結果</th>
+              <th>増減</th>
+              <th>対局後</th>
+            </tr>
+          </thead>
+
+          <tbody id="historyBody">
+          </tbody>
+
+        </table>
+
+      </div>
+
+    </section>
+
+
+    <section
+      id="chartCard"
+      class="card"
+      style="display: none;"
+    >
+
+      <h2>予想レート推移</h2>
+
+      <div class="chart-wrapper">
+        <canvas id="ratingChart"></canvas>
+      </div>
+
+    </section>
+
+
+    <section class="card">
+
+      <p class="note">
+        計算では小数のレートを内部に保持し、画面上では四捨五入した整数も表示します。
+        実際の日本オセロ連盟の表示レートと一致することを意図していますが、
+        連盟側が保有している非表示の小数レートが不明な場合、
+        現在表示されている整数レートだけを開始値にすると、
+        長い連続計算では1程度の差が生じる可能性があります。
+      </p>
+
+    </section>
+
+    <a class="back-link" href="index.html">
+      ← オセロツール一覧に戻る
+    </a>
+
+  </main>
+
+
+  <script>
+    let initialRating = null;
+    let currentRating = null;
+    let selectedResult = null;
+    let gameHistory = [];
+    let ratingChart = null;
+
+
+    /**
+     * レート差に応じた勝者の獲得値を計算する。
+     *
+     * difference:
+     * 勝者のレート - 敗者のレート
+     */
+    function calculateWinAdjustment(difference) {
+      return (
+        32 +
+        33 * Math.pow(difference / 600, 2)
+      ) / (
+        1 + Math.pow(2, difference / 100)
+      );
+    }
+
+
+    /**
+     * 自分のレート変動値を計算する。
+     */
+    function calculateRatingChange(
+      playerRating,
+      opponentRating,
+      result
+    ) {
+      const difference =
+        playerRating - opponentRating;
+
+      if (result === "win") {
+        return calculateWinAdjustment(difference);
+      }
+
+      if (result === "lose") {
+        /*
+         * 相手が勝者なので、
+         * 相手側から見たレート差で計算する。
+         */
+        return -calculateWinAdjustment(-difference);
+      }
+
+      if (result === "draw") {
+        const playerWinAdjustment =
+          calculateWinAdjustment(difference);
+
+        const opponentWinAdjustment =
+          calculateWinAdjustment(-difference);
+
+        return (
+          playerWinAdjustment -
+          opponentWinAdjustment
+        ) / 2;
+      }
+
+      throw new Error("対局結果が不正です。");
+    }
+
+
+    function startSimulation() {
+      const input =
+        document.getElementById("initialRating");
+
+      const error =
+        document.getElementById("startError");
+
+      error.textContent = "";
+
+      const value = Number(input.value);
+
+      if (
+        input.value.trim() === "" ||
+        !Number.isFinite(value) ||
+        value < 0
+      ) {
+        error.textContent =
+          "自分の現在レートを正しく入力してください。";
+        return;
+      }
+
+      initialRating = value;
+      currentRating = value;
+      selectedResult = null;
+      gameHistory = [];
+
+      document.getElementById(
+        "simulationCard"
+      ).style.display = "block";
+
+      document.getElementById(
+        "historyCard"
+      ).style.display = "none";
+
+      document.getElementById(
+        "chartCard"
+      ).style.display = "none";
+
+      document.getElementById(
+        "opponentRating"
+      ).value = "";
+
+      document.getElementById(
+        "nextMessage"
+      ).style.display = "block";
+
+      document.getElementById(
+        "nextMessage"
+      ).textContent =
+        "次に対戦したプレイヤーのレートを入力してください。";
+
+      clearResultSelection();
+      updateDisplay();
+
+      document.getElementById(
+        "simulationCard"
+      ).scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+
+      document.getElementById(
+        "opponentRating"
+      ).focus();
+    }
+
+
+    function selectResult(result) {
+      selectedResult = result;
+
+      const buttons =
+        document.querySelectorAll(".result-button");
+
+      buttons.forEach(button => {
+        button.classList.toggle(
+          "selected",
+          button.dataset.result === result
+        );
+      });
+    }
+
+
+    function clearResultSelection() {
+      selectedResult = null;
+
+      document
+        .querySelectorAll(".result-button")
+        .forEach(button => {
+          button.classList.remove("selected");
+        });
+    }
+
+
+    function resultToSymbol(result) {
+      if (result === "win") {
+        return "○";
+      }
+
+      if (result === "lose") {
+        return "×";
+      }
+
+      return "△";
+    }
+
+
+    function addGame() {
+      const opponentInput =
+        document.getElementById("opponentRating");
+
+      const error =
+        document.getElementById("gameError");
+
+      const nextMessage =
+        document.getElementById("nextMessage");
+
+      error.textContent = "";
+
+      const opponentRating =
+        Number(opponentInput.value);
+
+      if (
+        opponentInput.value.trim() === "" ||
+        !Number.isFinite(opponentRating) ||
+        opponentRating < 0
+      ) {
+        error.textContent =
+          "対戦相手のレートを正しく入力してください。";
+        return;
+      }
+
+      if (selectedResult === null) {
+        error.textContent =
+          "勝ち、引き分け、負けのいずれかを選択してください。";
+        return;
+      }
+
+      const beforeRating = currentRating;
+
+      const change = calculateRatingChange(
+        beforeRating,
+        opponentRating,
+        selectedResult
+      );
+
+      currentRating =
+        beforeRating + change;
+
+      gameHistory.push({
+        number: gameHistory.length + 1,
+        before: beforeRating,
+        opponent: opponentRating,
+        result: selectedResult,
+        change: change,
+        after: currentRating
+      });
+
+      updateDisplay();
+      updateHistory();
+      updateChart();
+
+      const signedChange =
+        change >= 0
+          ? "+" + change.toFixed(2)
+          : change.toFixed(2);
+
+      nextMessage.style.display = "block";
+
+      nextMessage.innerHTML =
+        "今回の予想変動は <strong>" +
+        signedChange +
+        "</strong>、対局後の予想レートは <strong>" +
+        Math.round(currentRating) +
+        "</strong> です。<br>" +
+        "次に対戦したプレイヤーのレートを入力してください。";
+
+      opponentInput.value = "";
+      clearResultSelection();
+      opponentInput.focus();
+    }
+
+
+    function updateDisplay() {
+      document.getElementById(
+        "currentRatingDisplay"
+      ).textContent =
+        Math.round(currentRating);
+
+      document.getElementById(
+        "decimalRatingDisplay"
+      ).textContent =
+        "内部計算値：" +
+        currentRating.toFixed(2);
+    }
+
+
+    function updateHistory() {
+      const historyBody =
+        document.getElementById("historyBody");
+
+      historyBody.innerHTML = "";
+
+      gameHistory.forEach(game => {
+        const row =
+          document.createElement("tr");
+
+        const signedChange =
+          game.change >= 0
+            ? "+" + game.change.toFixed(2)
+            : game.change.toFixed(2);
+
+        const changeClass =
+          game.change >= 0
+            ? "positive"
+            : "negative";
+
+        row.innerHTML = `
+          <td>${game.number}</td>
+          <td>${Math.round(game.before)}</td>
+          <td>${Math.round(game.opponent)}</td>
+          <td>${resultToSymbol(game.result)}</td>
+          <td class="${changeClass}">
+            ${signedChange}
+          </td>
+          <td>${Math.round(game.after)}</td>
+        `;
+
+        historyBody.appendChild(row);
+      });
+
+      document.getElementById(
+        "historyCard"
+      ).style.display =
+        gameHistory.length > 0
+          ? "block"
+          : "none";
+    }
+
+
+    function updateChart() {
+      const labels = [
+        "開始",
+        ...gameHistory.map(game =>
+          game.number + "局目"
+        )
+      ];
+
+      const ratings = [
+        initialRating,
+        ...gameHistory.map(game => game.after)
+      ];
+
+      const canvas =
+        document.getElementById("ratingChart");
+
+      if (ratingChart !== null) {
+        ratingChart.destroy();
+      }
+
+      ratingChart = new Chart(canvas, {
+        type: "line",
+
+        data: {
+          labels: labels,
+
+          datasets: [{
+            label: "予想レート",
+            data: ratings,
+            borderWidth: 3,
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            tension: 0.15,
+            fill: false
+          }]
+        },
+
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return (
+                    "レート：" +
+                    context.parsed.y.toFixed(2)
+                  );
+                }
+              }
+            }
+          },
+
+          scales: {
+            y: {
+              title: {
+                display: true,
+                text: "レーティング"
+              },
+
+              suggestedMin:
+                Math.min(...ratings) - 30,
+
+              suggestedMax:
+                Math.max(...ratings) + 30
+            },
+
+            x: {
+              title: {
+                display: true,
+                text: "対局"
+              }
+            }
+          }
+        }
+      });
+
+      document.getElementById(
+        "chartCard"
+      ).style.display = "block";
+    }
+
+
+    function undoLastGame() {
+      const error =
+        document.getElementById("gameError");
+
+      error.textContent = "";
+
+      if (gameHistory.length === 0) {
+        error.textContent =
+          "戻せる対局がありません。";
+        return;
+      }
+
+      gameHistory.pop();
+
+      if (gameHistory.length === 0) {
+        currentRating = initialRating;
+
+        document.getElementById(
+          "nextMessage"
+        ).textContent =
+          "次に対戦したプレイヤーのレートを入力してください。";
+      } else {
+        currentRating =
+          gameHistory[
+            gameHistory.length - 1
+          ].after;
+
+        document.getElementById(
+          "nextMessage"
+        ).textContent =
+          "直前の対局を取り消しました。次に対戦したプレイヤーのレートを入力してください。";
+      }
+
+      updateDisplay();
+      updateHistory();
+
+      if (gameHistory.length === 0) {
+        document.getElementById(
+          "chartCard"
+        ).style.display = "none";
+
+        if (ratingChart !== null) {
+          ratingChart.destroy();
+          ratingChart = null;
+        }
+      } else {
+        updateChart();
+      }
+
+      document.getElementById(
+        "opponentRating"
+      ).focus();
+    }
+
+
+    function resetSimulation() {
+      initialRating = null;
+      currentRating = null;
+      selectedResult = null;
+      gameHistory = [];
+
+      document.getElementById(
+        "initialRating"
+      ).value = "";
+
+      document.getElementById(
+        "opponentRating"
+      ).value = "";
+
+      document.getElementById(
+        "startError"
+      ).textContent = "";
+
+      document.getElementById(
+        "gameError"
+      ).textContent = "";
+
+      document.getElementById(
+        "simulationCard"
+      ).style.display = "none";
+
+      document.getElementById(
+        "historyCard"
+      ).style.display = "none";
+
+      document.getElementById(
+        "chartCard"
+      ).style.display = "none";
+
+      if (ratingChart !== null) {
+        ratingChart.destroy();
+        ratingChart = null;
+      }
+
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+      });
+    }
+
+
+    /*
+     * 相手レート欄でEnterを押したときも追加できる。
+     * ただし、結果が選択されている必要がある。
+     */
+    document
+      .getElementById("opponentRating")
+      .addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+          addGame();
+        }
+      });
+  </script>
+
+</body>
+</html>
