@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <title>オセロ棋譜 ホワイトライン軸変換</title>
 
   <style>
@@ -19,11 +20,12 @@
       background: white;
       padding: 24px;
       border-radius: 12px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
     }
 
     h1 {
       margin-top: 0;
+      font-size: 24px;
     }
 
     textarea {
@@ -34,6 +36,8 @@
       font-family: monospace;
       box-sizing: border-box;
       resize: vertical;
+      border: 1px solid #aaa;
+      border-radius: 6px;
     }
 
     button {
@@ -51,12 +55,8 @@
       background: #125ca5;
     }
 
-    #output {
-      margin-top: 10px;
-    }
-
     .error {
-      color: red;
+      color: #d32f2f;
       margin-top: 10px;
     }
 
@@ -64,98 +64,164 @@
       color: #555;
       font-size: 14px;
     }
+
+    #output {
+      margin-top: 10px;
+    }
   </style>
 </head>
 
 <body>
 
-<div class="container">
+  <div class="container">
 
-<h1>オセロ棋譜 ホワイトライン軸変換</h1>
+    <h1>オセロ棋譜 ホワイトライン軸変換</h1>
 
-<p>
-A1-H8（ホワイトライン）を軸として線対称に変換します。
-</p>
+    <p>
+      A1からH8を結ぶホワイトラインを軸として、
+      棋譜を線対称に変換します。
+    </p>
 
-<p class="example">
-例：A2→B1、A4→D1、B1→A2、B2→B2
-</p>
+    <p class="example">
+      入力例：f2f5b6a4<br>
+      変換例：F2 → B6
+    </p>
 
-<label>変換前</label>
+    <label for="input">変換前の棋譜</label>
 
-<textarea id="input"
-placeholder="例：
-F5 D6 C3 D3 C4"></textarea>
+    <textarea
+      id="input"
+      placeholder="例：f2f5b6a4"
+    ></textarea>
 
-<br>
+    <button type="button" onclick="convertRecord()">
+      変換する
+    </button>
 
-<button onclick="convertRecord()">
-変換する
-</button>
+    <p id="error" class="error"></p>
 
-<p id="error" class="error"></p>
+    <label for="output">変換後の棋譜</label>
 
-<label>変換後</label>
+    <textarea
+      id="output"
+      readonly
+    ></textarea>
 
-<textarea id="output" readonly></textarea>
+  </div>
 
-</div>
+  <script>
 
-<script>
+    /*
+     * 1手分の座標を変換する。
+     *
+     * 例：
+     * A2 → B1
+     * F2 → B6
+     * B2 → B2
+     */
+    function transposeMove(move) {
 
-function transposeMove(move){
+      const normalizedMove = move.toUpperCase();
 
-    // 前後の空白除去＆大文字化
-    move = move.trim().toUpperCase();
+      if (!/^[A-H][1-8]$/.test(normalizedMove)) {
+        throw new Error("不正な座標です：" + move);
+      }
 
-    // A～H、1～8 の形式かチェック
-    if(!/^[A-H][1-8]$/.test(move)){
-        throw new Error("不正な座標：" + move);
+      const column = normalizedMove[0];
+      const row = normalizedMove[1];
+
+      // 元の行番号を、新しい列にする
+      // 1 → A、2 → B、…、8 → H
+      const newColumn = String.fromCharCode(
+        "A".charCodeAt(0) + Number(row) - 1
+      );
+
+      // 元の列を、新しい行番号にする
+      // A → 1、B → 2、…、H → 8
+      const newRow =
+        column.charCodeAt(0) - "A".charCodeAt(0) + 1;
+
+      return newColumn + newRow;
     }
 
-    const col = move.charCodeAt(0) - 65;   // A→0
-    const row = Number(move[1]) - 1;        // 1→0
 
-    // 行列入れ替え
-    const newCol = String.fromCharCode(65 + row);
-    const newRow = col + 1;
+    /*
+     * 連続した棋譜全体を変換する。
+     *
+     * 例：
+     * f2f5b6a4
+     * ↓
+     * B6E6F2D1
+     */
+    function convertRecord() {
 
-    return newCol + newRow;
-}
+      const inputElement = document.getElementById("input");
+      const outputElement = document.getElementById("output");
+      const errorElement = document.getElementById("error");
 
-function convertRecord(){
+      errorElement.textContent = "";
+      outputElement.value = "";
 
-    const input = document.getElementById("input").value;
+      /*
+       * 空白、改行、カンマを削除する。
+       *
+       * そのため、
+       * f2f5b6a4
+       * f2 f5 b6 a4
+       * f2,f5,b6,a4
+       *
+       * のどれでも入力可能。
+       */
+      const record = inputElement.value
+        .replace(/[\s,]+/g, "")
+        .toUpperCase();
 
-    const output = document.getElementById("output");
+      if (record === "") {
+        errorElement.textContent = "棋譜を入力してください。";
+        return;
+      }
 
-    const error = document.getElementById("error");
+      /*
+       * 1手は2文字なので、
+       * 棋譜全体の文字数は偶数である必要がある。
+       */
+      if (record.length % 2 !== 0) {
+        errorElement.textContent =
+          "棋譜の文字数が不正です。最後の座標が途中で切れていないか確認してください。";
+        return;
+      }
 
-    error.textContent = "";
+      const moves = [];
 
-    try{
+      /*
+       * 2文字ずつ分割する。
+       *
+       * f2f5b6a4
+       * ↓
+       * ["F2", "F5", "B6", "A4"]
+       */
+      for (let i = 0; i < record.length; i += 2) {
+        moves.push(record.slice(i, i + 2));
+      }
 
-        const moves = input
-            .split(/[\s,]+/)
-            .filter(x => x.length > 0);
+      try {
 
-        const converted = moves.map(transposeMove);
+        const convertedMoves = moves.map(transposeMove);
 
-        output.value = converted.join(" ");
+        /*
+         * 変換後も連続した棋譜として出力する。
+         */
+        outputElement.value = convertedMoves.join("");
 
+      } catch (error) {
+
+        outputElement.value = "";
+        errorElement.textContent = error.message;
+
+      }
     }
 
-    catch(e){
-
-        output.value = "";
-
-        error.textContent = e.message;
-
-    }
-
-}
-
-</script>
+  </script>
 
 </body>
 </html>
