@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>オセロ棋譜 斜め反転変換</title>
+
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 720px;
+      margin: 40px auto;
+      padding: 0 20px;
+      line-height: 1.6;
+      background: #f5f5f5;
+    }
+
+    .container {
+      background: white;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      font-size: 24px;
+      margin-top: 0;
+    }
+
+    textarea {
+      box-sizing: border-box;
+      width: 100%;
+      min-height: 140px;
+      padding: 12px;
+      font-size: 16px;
+      font-family: monospace;
+      border: 1px solid #aaa;
+      border-radius: 6px;
+      resize: vertical;
+    }
+
+    button {
+      margin-top: 12px;
+      padding: 10px 24px;
+      font-size: 16px;
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      background: #1976d2;
+      color: white;
+    }
+
+    button:hover {
+      background: #125ca5;
+    }
+
+    .error {
+      color: #d32f2f;
+      margin-top: 10px;
+    }
+
+    .example {
+      color: #555;
+      font-size: 14px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>オセロ棋譜 斜め反転変換</h1>
+
+    <p>
+      A1からH8を結ぶ対角線を軸として、棋譜の各座標を線対称に変換します。
+    </p>
+
+    <p class="example">
+      例：A2 → B1、A4 → D1、B2 → B2
+    </p>
+
+    <label for="input">変換前の棋譜</label>
+    <textarea
+      id="input"
+      placeholder="例：F5 D6 C3 D3 C4"
+    ></textarea>
+
+    <button type="button" onclick="convertRecord()">変換する</button>
+
+    <p id="error" class="error"></p>
+
+    <label for="output">変換後の棋譜</label>
+    <textarea id="output" readonly></textarea>
+  </div>
+
+  <script>
+    /**
+     * 1手分の座標を、A1-H8の対角線を軸として線対称に変換する。
+     *
+     * 例:
+     * A2 -> B1
+     * A4 -> D1
+     * B2 -> B2
+     *
+     * @param {string} move 変換前の座標
+     * @returns {string} 変換後の座標
+     */
+    function transposeMove(move) {
+      const normalizedMove = move.trim().toUpperCase();
+
+      // A1～H8の形式か確認
+      if (!/^[A-H][1-8]$/.test(normalizedMove)) {
+        throw new Error(`不正な座標です: ${move}`);
+      }
+
+      const column = normalizedMove[0];
+      const row = normalizedMove[1];
+
+      // 行番号を新しい列文字に変換
+      // 1 -> A, 2 -> B, ..., 8 -> H
+      const newColumn = String.fromCharCode(
+        "A".charCodeAt(0) + Number(row) - 1
+      );
+
+      // 元の列文字を新しい行番号に変換
+      // A -> 1, B -> 2, ..., H -> 8
+      const newRow =
+        column.charCodeAt(0) - "A".charCodeAt(0) + 1;
+
+      return newColumn + newRow;
+    }
+
+    /**
+     * 入力された棋譜全体を変換する。
+     */
+    function convertRecord() {
+      const inputElement = document.getElementById("input");
+      const outputElement = document.getElementById("output");
+      const errorElement = document.getElementById("error");
+
+      errorElement.textContent = "";
+      outputElement.value = "";
+
+      const input = inputElement.value.trim();
+
+      if (input === "") {
+        errorElement.textContent = "棋譜を入力してください。";
+        return;
+      }
+
+      /*
+       * 空白、改行、カンマで区切られた棋譜に対応する。
+       *
+       * 例:
+       * F5 D6 C3
+       * F5,D6,C3
+       */
+      const moves = input
+        .split(/[\s,]+/)
+        .filter(move => move !== "");
+
+      try {
+        const convertedMoves = moves.map(transposeMove);
+        outputElement.value = convertedMoves.join(" ");
+      } catch (error) {
+        errorElement.textContent = error.message;
+      }
+    }
+  </script>
+</body>
+</html>
