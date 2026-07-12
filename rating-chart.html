@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>オセロ レーティング推移グラフ</title>
+
+  <!-- グラフ描画用ライブラリ -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px 16px;
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        "Hiragino Kaku Gothic ProN",
+        "Yu Gothic",
+        sans-serif;
+      background: #f3f5f4;
+      color: #222;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .card {
+      margin-bottom: 20px;
+      padding: 22px;
+      background: white;
+      border-radius: 14px;
+      box-shadow: 0 3px 14px rgba(0, 0, 0, 0.09);
+    }
+
+    h1 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      text-align: center;
+      font-size: 28px;
+    }
+
+    .description {
+      margin-bottom: 24px;
+      color: #555;
+      line-height: 1.7;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 260px;
+      padding: 12px;
+      font-size: 15px;
+      line-height: 1.5;
+      border: 1px solid #aaa;
+      border-radius: 8px;
+      resize: vertical;
+    }
+
+    .button-area {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    button {
+      min-height: 46px;
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .main-button {
+      color: white;
+      background: #08783e;
+    }
+
+    .main-button:hover {
+      background: #056330;
+    }
+
+    .sub-button {
+      color: #333;
+      background: #e5e7e6;
+    }
+
+    .sub-button:hover {
+      background: #d7dad8;
+    }
+
+    .error {
+      min-height: 24px;
+      margin-top: 12px;
+      color: #c62828;
+      font-weight: bold;
+    }
+
+    .summary {
+      display: none;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .summary-item {
+      padding: 14px 8px;
+      text-align: center;
+      background: #f4f7f5;
+      border-radius: 10px;
+    }
+
+    .summary-label {
+      display: block;
+      margin-bottom: 4px;
+      color: #666;
+      font-size: 13px;
+    }
+
+    .summary-value {
+      display: block;
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .chart-wrapper {
+      position: relative;
+      width: 100%;
+      height: 460px;
+    }
+
+    .back-link {
+      display: block;
+      margin-top: 24px;
+      text-align: center;
+      color: #08783e;
+      text-decoration: none;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
+
+    .note {
+      color: #666;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    @media (max-width: 600px) {
+      body {
+        padding: 14px 10px;
+      }
+
+      .card {
+        padding: 16px;
+      }
+
+      h1 {
+        font-size: 23px;
+      }
+
+      textarea {
+        min-height: 220px;
+        font-size: 14px;
+      }
+
+      .summary {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .chart-wrapper {
+        height: 380px;
+      }
+
+      button {
+        flex: 1;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <main class="container">
+
+    <section class="card">
+
+      <h1>オセロ レーティング推移</h1>
+
+      <p class="description">
+        日本オセロ連盟の選手ページに表示されている文章を貼り付けると、
+        対局ごとのレーティング推移を折れ線グラフで表示します。
+      </p>
+
+      <label for="ratingInput">
+        レーティングページの内容
+      </label>
+
+      <textarea
+        id="ratingInput"
+        placeholder="日本オセロ連盟の選手ページを全選択してコピーし、ここに貼り付けてください。"
+      ></textarea>
+
+      <div class="button-area">
+        <button
+          type="button"
+          class="main-button"
+          onclick="createRatingChart()"
+        >
+          グラフを作成
+        </button>
+
+        <button
+          type="button"
+          class="sub-button"
+          onclick="clearAll()"
+        >
+          クリア
+        </button>
+      </div>
+
+      <p id="errorMessage" class="error"></p>
+
+      <p class="note">
+        対局履歴は、ページに表示された新しい順から古い順の並びを、
+        自動的に古い順へ並べ替えて表示します。
+      </p>
+
+    </section>
+
+
+    <section id="resultCard" class="card" style="display: none;">
+
+      <div id="summary" class="summary">
+
+        <div class="summary-item">
+          <span class="summary-label">開始レート</span>
+          <span id="startRating" class="summary-value">―</span>
+        </div>
+
+        <div class="summary-item">
+          <span class="summary-label">現在レート</span>
+          <span id="currentRating" class="summary-value">―</span>
+        </div>
+
+        <div class="summary-item">
+          <span class="summary-label">最高レート</span>
+          <span id="highestRating" class="summary-value">―</span>
+        </div>
+
+        <div class="summary-item">
+          <span class="summary-label">対局数</span>
+          <span id="gameCount" class="summary-value">―</span>
+        </div>
+
+      </div>
+
+      <div class="chart-wrapper">
+        <canvas id="ratingChart"></canvas>
+      </div>
+
+    </section>
+
+    <a class="back-link" href="index.html">
+      ← オセロツール一覧に戻る
+    </a>
+
+  </main>
+
+
+  <script>
+    let ratingChartInstance = null;
+
+
+    /**
+     * ページ上部の
+     * 「変動：1447 → 1386」
+     * から開始レートを取得する。
+     */
+    function extractInitialRating(text) {
+      const match = text.match(
+        /変動[：:]\s*(\d{3,4})\s*[→\-＞>]+\s*(\d{3,4})/
+      );
+
+      if (!match) {
+        return null;
+      }
+
+      return {
+        start: Number(match[1]),
+        current: Number(match[2])
+      };
+    }
+
+
+    /**
+     * ページ上部の
+     * 「最高：1475」
+     * から最高レートを取得する。
+     */
+    function extractDisplayedHighestRating(text) {
+      const match = text.match(/最高[：:]\s*(\d{3,4})/);
+
+      return match ? Number(match[1]) : null;
+    }
+
+
+    /**
+     * 入力された文章を行ごとに整理する。
+     */
+    function normalizeLines(text) {
+      return text
+        .replace(/\r/g, "")
+        .split("\n")
+        .map(line => line.trim())
+        .filter(line => line !== "");
+    }
+
+
+    /**
+     * 日本オセロ連盟の対局履歴から、
+     * 日付、結果、対局後レート、増減値を読み取る。
+     */
+    function extractGames(text) {
+      const lines = normalizeLines(text);
+      const games = [];
+
+      for (let i = 0; i < lines.length; i++) {
+
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(lines[i])) {
+          continue;
+        }
+
+        const date = lines[i];
+        const block = [];
+
+        /*
+         * 次の日付が見つかるまでを、1対局分として取得する。
+         */
+        for (let j = i + 1; j < lines.length; j++) {
+          if (/^\d{4}-\d{2}-\d{2}$/.test(lines[j])) {
+            break;
+          }
+
+          block.push(lines[j]);
+        }
+
+        /*
+         * ○、×、△の位置を探す。
+         */
+        const resultIndex = block.findIndex(line =>
+          /^[○◯×△]$/.test(line)
+        );
+
+        if (resultIndex === -1) {
+          continue;
+        }
+
+        let rating = null;
+        let change = null;
+
+        /*
+         * 結果記号より後ろにある最初の整数を
+         * 対局後レートとして取得する。
+         */
+        for (let j = resultIndex + 1; j < block.length; j++) {
+
+          if (rating === null && /^\d{3,4}$/.test(block[j])) {
+            rating = Number(block[j]);
+            continue;
+          }
+
+          if (
+            rating !== null &&
+            /^[+-]\d+$/.test(block[j])
+          ) {
+            change = Number(block[j]);
+            break;
+          }
+        }
+
+        if (rating !== null) {
+          games.push({
+            date: date,
+            result: block[resultIndex],
+            rating: rating,
+            change: change
+          });
+        }
+      }
+
+      return games;
+    }
+
+
+    /**
+     * グラフ用の日付表示を作成する。
+     * 同じ日に複数対局ある場合は「1局目」などを付ける。
+     */
+    function createLabels(games) {
+      const dateCounts = {};
+      const dateNumbers = {};
+
+      games.forEach(game => {
+        dateCounts[game.date] =
+          (dateCounts[game.date] || 0) + 1;
+      });
+
+      return games.map(game => {
+        dateNumbers[game.date] =
+          (dateNumbers[game.date] || 0) + 1;
+
+        const shortDate = game.date
+          .replace(/^\d{4}-/, "")
+          .replace("-", "/");
+
+        if (dateCounts[game.date] === 1) {
+          return shortDate;
+        }
+
+        return (
+          shortDate +
+          " " +
+          dateNumbers[game.date] +
+          "局目"
+        );
+      });
+    }
+
+
+    /**
+     * グラフを作成する。
+     */
+    function createRatingChart() {
+      const input =
+        document.getElementById("ratingInput").value;
+
+      const errorMessage =
+        document.getElementById("errorMessage");
+
+      const resultCard =
+        document.getElementById("resultCard");
+
+      errorMessage.textContent = "";
+
+      if (input.trim() === "") {
+        resultCard.style.display = "none";
+        errorMessage.textContent =
+          "レーティングページの内容を貼り付けてください。";
+        return;
+      }
+
+      const ratingSummary = extractInitialRating(input);
+      const displayedHighest =
+        extractDisplayedHighestRating(input);
+
+      /*
+       * ページ上では最新対局から表示されるため、
+       * reverse()で古い対局から並べ直す。
+       */
+      const games = extractGames(input).reverse();
+
+      if (games.length === 0) {
+        resultCard.style.display = "none";
+        errorMessage.textContent =
+          "対局履歴を読み取れませんでした。ページの対局表を含めて貼り付けてください。";
+        return;
+      }
+
+      /*
+       * 開始レートがページ上部から取得できない場合は、
+       * 最初の対局後レートと増減値から逆算する。
+       */
+      let initialRating = null;
+
+      if (ratingSummary !== null) {
+        initialRating = ratingSummary.start;
+      } else if (
+        games[0].change !== null
+      ) {
+        initialRating =
+          games[0].rating - games[0].change;
+      }
+
+      if (initialRating === null) {
+        initialRating = games[0].rating;
+      }
+
+      const labels = [
+        "開始",
+        ...createLabels(games)
+      ];
+
+      const ratings = [
+        initialRating,
+        ...games.map(game => game.rating)
+      ];
+
+      const currentRating =
+        ratings[ratings.length - 1];
+
+      const calculatedHighest =
+        Math.max(...ratings);
+
+      const highestRating =
+        displayedHighest !== null
+          ? displayedHighest
+          : calculatedHighest;
+
+      document.getElementById("startRating").textContent =
+        initialRating;
+
+      document.getElementById("currentRating").textContent =
+        currentRating;
+
+      document.getElementById("highestRating").textContent =
+        highestRating;
+
+      document.getElementById("gameCount").textContent =
+        games.length;
+
+      document.getElementById("summary").style.display =
+        "grid";
+
+      resultCard.style.display = "block";
+
+      const canvas =
+        document.getElementById("ratingChart");
+
+      if (ratingChartInstance !== null) {
+        ratingChartInstance.destroy();
+      }
+
+      ratingChartInstance = new Chart(canvas, {
+        type: "line",
+
+        data: {
+          labels: labels,
+
+          datasets: [{
+            label: "レーティング",
+            data: ratings,
+            borderWidth: 3,
+            pointRadius: 4,
+            pointHoverRadius: 7,
+            tension: 0.15,
+            fill: false
+          }]
+        },
+
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+
+          interaction: {
+            mode: "index",
+            intersect: false
+          },
+
+          plugins: {
+            legend: {
+              display: true
+            },
+
+            tooltip: {
+              callbacks: {
+                afterLabel: function(context) {
+                  if (context.dataIndex === 0) {
+                    return "集計開始時";
+                  }
+
+                  const game =
+                    games[context.dataIndex - 1];
+
+                  const changeText =
+                    game.change === null
+                      ? ""
+                      : game.change > 0
+                        ? "+" + game.change
+                        : String(game.change);
+
+                  return [
+                    "日付：" + game.date,
+                    "結果：" + game.result,
+                    "増減：" + changeText
+                  ];
+                }
+              }
+            }
+          },
+
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: "対局"
+              },
+
+              ticks: {
+                maxRotation: 70,
+                minRotation: 45,
+                autoSkip: true,
+                maxTicksLimit: 15
+              }
+            },
+
+            y: {
+              title: {
+                display: true,
+                text: "レーティング"
+              },
+
+              /*
+               * グラフが極端に平らになるのを防ぐため、
+               * 最低値と最高値の周囲に余白を設ける。
+               */
+              suggestedMin:
+                Math.min(...ratings) - 30,
+
+              suggestedMax:
+                Math.max(...ratings) + 30
+            }
+          }
+        }
+      });
+
+      resultCard.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    }
+
+
+    /**
+     * 入力、エラー、グラフをすべて消去する。
+     */
+    function clearAll() {
+      document.getElementById("ratingInput").value = "";
+      document.getElementById("errorMessage").textContent = "";
+      document.getElementById("resultCard").style.display =
+        "none";
+
+      if (ratingChartInstance !== null) {
+        ratingChartInstance.destroy();
+        ratingChartInstance = null;
+      }
+    }
+  </script>
+
+</body>
+</html>
